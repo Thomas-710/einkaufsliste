@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2e7d32" />
+  <title>Einkaufsliste</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🛒 Einkaufsliste</h1>
+    <span id="counter" class="counter"></span>
+  </header>
+
+  <main>
+    <form id="add-form" class="add-form" autocomplete="off">
+      <div class="row">
+        <input id="item-input" class="item-input" type="text" placeholder="Artikel hinzufügen…" required />
+        <input id="qty-input" class="qty-input" type="text" placeholder="Menge" value="1" />
+        <button type="submit" class="btn-add" aria-label="Hinzufügen">＋</button>
+      </div>
+      <div class="row">
+        <input id="shop-input" class="shop-input" type="text" list="shop-list" placeholder="Geschäft (optional, z. B. Aldi)" />
+        <datalist id="shop-list"></datalist>
+      </div>
+    </form>
+
+    <div class="controls">
+      <button id="btn-group" type="button" class="ctrl">📂 Nach Geschäft gruppieren</button>
+      <button id="btn-fav" type="button" class="ctrl">⭐ Favoriten</button>
+    </div>
+
+    <div id="list" class="list-wrap"></div>
+
+    <p id="empty-hint" class="empty-hint">Noch keine Artikel. Füge oben etwas hinzu. 🥕</p>
+  </main>
+
+  <nav class="toolbar">
+    <button id="btn-share" class="tool">📲 WhatsApp</button>
+    <button id="btn-export" class="tool">⬇️ CSV</button>
+    <button id="btn-import" class="tool">⬆️ Import</button>
+    <button id="btn-clear-done" class="tool">✓ Erledigte weg</button>
+  </nav>
+
+  <!-- Favoriten-Sheet -->
+  <div id="fav-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-label="Favoriten">
+      <div class="sheet-head">
+        <h2>⭐ Favoriten</h2>
+        <button id="fav-close" class="sheet-x" aria-label="Schließen" data-close>✕</button>
+      </div>
+      <p class="sheet-hint">Tippe einen Favoriten, um ihn zur aktuellen Liste hinzuzufügen.</p>
+      <ul id="fav-list" class="fav-list"></ul>
+      <label class="fav-toggle">
+        <input type="checkbox" id="fav-autoload" />
+        <span>Favoriten beim Start automatisch laden (wenn die Liste leer ist)</span>
+      </label>
+      <div class="sheet-actions">
+        <button id="fav-add-all" type="button" class="tool">Alle zur Liste hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <input id="file-input" type="file" accept=".csv,text/csv,text/comma-separated-values" hidden />
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
