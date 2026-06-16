@@ -17,6 +17,13 @@
   </header>
 
   <main>
+    <div class="list-bar">
+      <select id="list-select" class="list-select" aria-label="Liste auswählen"></select>
+      <button id="list-new" type="button" class="list-btn" aria-label="Neue Liste" title="Neue Liste">＋</button>
+      <button id="list-rename" type="button" class="list-btn" aria-label="Liste umbenennen" title="Liste umbenennen">✎</button>
+      <button id="list-delete" type="button" class="list-btn" aria-label="Liste löschen" title="Liste löschen">🗑</button>
+    </div>
+
     <form id="add-form" class="add-form" autocomplete="off">
       <div class="row">
         <input id="item-input" class="item-input" type="text" placeholder="Artikel hinzufügen…" required />
@@ -63,6 +70,17 @@
       <div class="sheet-actions">
         <button id="fav-add-all" type="button" class="tool">Alle zur Liste hinzufügen</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Eigenes Eingabe-/Abfragefenster -->
+  <div id="dialog" class="dialog" hidden>
+    <div class="dialog-backdrop"></div>
+    <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <h2 id="dialog-title" class="dialog-title"></h2>
+      <p id="dialog-msg" class="dialog-msg"></p>
+      <input id="dialog-input" class="dialog-input" type="text" />
+      <div id="dialog-actions" class="dialog-actions"></div>
     </div>
   </div>
 

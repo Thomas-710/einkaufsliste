@@ -49,6 +49,30 @@ main {
   margin: 0 auto;
 }
 
+.list-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.list-select {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--card);
+  color: var(--text);
+}
+.list-select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-light); }
+.list-btn {
+  flex-shrink: 0;
+  width: 46px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 12px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.list-btn:active { background: var(--green-light); }
+
 .add-form { margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
 .add-form .row { display: flex; gap: 8px; }
 
@@ -82,6 +106,11 @@ main {
   flex-shrink: 0;
 }
 .btn-add:active { background: var(--green-dark); }
+
+/* Bearbeiten-Modus */
+.add-form.editing .item-input { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245,166,35,.25); }
+.add-form.editing .btn-add { background: var(--gold); }
+.add-form.editing .btn-add:active { background: #d98e0c; }
 
 .controls { display: flex; gap: 8px; margin-bottom: 12px; }
 .ctrl {
@@ -158,7 +187,7 @@ ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 }
 .item.done .check { background: var(--green); }
 
-.item .label { flex: 1; min-width: 0; font-size: 1.02rem; word-break: break-word; cursor: pointer; }
+.item .label { flex: 1; min-width: 0; font-size: 1.02rem; word-break: break-word; cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .item .qty { color: var(--muted); font-size: .85rem; margin-left: 6px; }
 .item .shop-chip {
   display: inline-block;
@@ -246,6 +275,48 @@ ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 }
 .fav-toggle input { width: 20px; height: 20px; accent-color: var(--green); flex-shrink: 0; }
 .sheet-actions { margin-top: 12px; }
+
+/* Eigenes Eingabe-/Abfragefenster */
+.dialog { position: fixed; inset: 0; z-index: 50; }
+.dialog[hidden] { display: none; }
+.dialog-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.dialog-box {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 420px);
+  background: var(--card);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.3);
+}
+.dialog-title { margin: 0 0 8px; font-size: 1.15rem; }
+.dialog-msg { margin: 0 0 12px; color: var(--text); font-size: .95rem; line-height: 1.4; }
+.dialog-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  background: var(--card);
+  color: var(--text);
+  margin-bottom: 14px;
+}
+.dialog-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-light); }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.dlg-btn {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dlg-btn.primary { background: var(--green); color: #fff; border-color: var(--green); }
+.dlg-btn.danger { background: #fdecea; color: var(--danger); border-color: #f5c6c2; }
+.dlg-btn:active { filter: brightness(.95); }
 
 .toast {
   position: fixed;

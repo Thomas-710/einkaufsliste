@@ -6,9 +6,12 @@
   const ITEMS_KEY_OLD = 'einkaufsliste.items.v1';
   const FAV_KEY = 'einkaufsliste.favorites.v1';
   const SET_KEY = 'einkaufsliste.settings.v1';
+  const LISTS_KEY = 'einkaufsliste.lists.v1';
 
+  /** @type {{activeId:string, lists:{id:string,name:string,items:object[]}[]}} */
+  let store = loadLists();
   /** @type {{id:string,name:string,qty:string,shop:string,done:boolean,fav:boolean}[]} */
-  let items = loadItems();
+  let items = activeList().items;   // verweist immer auf die aktive Liste
   /** @type {{name:string,qty:string,shop:string}[]} */
   let favorites = loadJSON(FAV_KEY, []);
   let settings = loadJSON(SET_KEY, { grouped: false, collapsed: [], selectedId: null, shopOrder: [], autoloadFav: false });
@@ -30,17 +33,20 @@
   const fileInput = document.getElementById('file-input');
   const toastEl = document.getElementById('toast');
   const btnGroup = document.getElementById('btn-group');
+  const btnAdd = document.querySelector('.btn-add');
   const favSheet = document.getElementById('fav-sheet');
   const favListEl = document.getElementById('fav-list');
+  const listSelect = document.getElementById('list-select');
+
+  let editIndex = -1;       // >=0: ein Eintrag wird gerade bearbeitet (Zielposition)
+  let suppressClick = 0;    // unterdrückt den Klick direkt nach langem Berühren
 
   // --- Laden / Speichern ---
   function loadJSON(key, fallback) {
     try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
     catch { return fallback; }
   }
-  function loadItems() {
-    let arr = loadJSON(ITEMS_KEY, null);
-    if (!Array.isArray(arr)) arr = loadJSON(ITEMS_KEY_OLD, []); // Migration v1 -> v2
+  function normalizeItems(arr) {
     if (!Array.isArray(arr)) return [];
     return arr.map(it => ({
       id: it.id || uid(),
@@ -51,7 +57,25 @@
       fav: !!it.fav
     }));
   }
-  function saveItems() { localStorage.setItem(ITEMS_KEY, JSON.stringify(items)); }
+  function loadItemsLegacy() {
+    let arr = loadJSON(ITEMS_KEY, null);
+    if (!Array.isArray(arr)) arr = loadJSON(ITEMS_KEY_OLD, []); // alter Einzel-Listen-Speicher
+    return normalizeItems(arr);
+  }
+  function loadLists() {
+    const s = loadJSON(LISTS_KEY, null);
+    if (s && Array.isArray(s.lists) && s.lists.length) {
+      s.lists.forEach(l => { l.id = l.id || uid(); l.name = l.name || 'Liste'; l.items = normalizeItems(l.items); });
+      if (!s.activeId || !s.lists.some(l => l.id === s.activeId)) s.activeId = s.lists[0].id;
+      return s;
+    }
+    // Migration: bestehende Einzelliste übernehmen
+    const id = uid();
+    return { activeId: id, lists: [{ id, name: 'Meine Liste', items: loadItemsLegacy() }] };
+  }
+  function activeList() { return store.lists.find(l => l.id === store.activeId) || store.lists[0]; }
+  function persistLists() { localStorage.setItem(LISTS_KEY, JSON.stringify(store)); }
+  function saveItems() { activeList().items = items; persistLists(); }
   function saveFav() { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); }
   function saveSettings() {
     settings = { grouped, collapsed: [...collapsed], selectedId, shopOrder, autoloadFav };
@@ -62,6 +86,125 @@
     selectedId = null;
   }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  // --- Eigenes Dialogfenster (ersetzt prompt/confirm) ---
+  const dialogEl = document.getElementById('dialog');
+  const dlgTitle = document.getElementById('dialog-title');
+  const dlgMsg = document.getElementById('dialog-msg');
+  const dlgInput = document.getElementById('dialog-input');
+  const dlgActions = document.getElementById('dialog-actions');
+  let dlgResolve = null;
+
+  function openDialog({ title, message, input, buttons }) {
+    return new Promise((resolve) => {
+      dlgResolve = resolve;
+      dlgTitle.textContent = title || '';
+      dlgMsg.textContent = message || '';
+      dlgMsg.style.display = message ? 'block' : 'none';
+      const hasInput = input !== undefined && input !== null;
+      dlgInput.style.display = hasInput ? 'block' : 'none';
+      dlgInput.value = hasInput ? input : '';
+      dlgActions.innerHTML = '';
+      buttons.forEach((b) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dlg-btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : '');
+        btn.textContent = b.label;
+        btn.addEventListener('click', () => closeDialog(b.input ? dlgInput.value : b.value));
+        dlgActions.appendChild(btn);
+      });
+      dialogEl.hidden = false;
+      if (hasInput) setTimeout(() => { dlgInput.focus(); dlgInput.select(); }, 30);
+    });
+  }
+  function closeDialog(value) {
+    dialogEl.hidden = true;
+    const r = dlgResolve; dlgResolve = null;
+    if (r) r(value);
+  }
+  dialogEl.querySelector('.dialog-backdrop').addEventListener('click', () => closeDialog(undefined));
+  dlgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); const p = dlgActions.querySelector('.dlg-btn.primary'); if (p) p.click(); }
+  });
+  document.addEventListener('keydown', (e) => { if (!dialogEl.hidden && e.key === 'Escape') closeDialog(undefined); });
+
+  // Liefert den eingegebenen Text oder null (Abbruch)
+  function dialogPrompt(title, defValue, okLabel) {
+    return openDialog({
+      title, input: defValue || '',
+      buttons: [
+        { label: 'Abbrechen', value: null },
+        { label: okLabel || 'OK', input: true, primary: true }
+      ]
+    }).then(v => (v == null ? null : v));
+  }
+  // Liefert true/false
+  function dialogConfirm(title, message, okLabel, cancelLabel, danger) {
+    return openDialog({
+      title, message,
+      buttons: [
+        { label: cancelLabel || 'Abbrechen', value: false },
+        { label: okLabel || 'OK', value: true, primary: !danger, danger: !!danger }
+      ]
+    }).then(v => v === true);
+  }
+
+  // --- Listen-Verwaltung ---
+  function renderListBar() {
+    listSelect.innerHTML = '';
+    store.lists.forEach(l => {
+      const o = document.createElement('option');
+      o.value = l.id; o.textContent = l.name;
+      if (l.id === store.activeId) o.selected = true;
+      listSelect.appendChild(o);
+    });
+  }
+  function switchList(id) {
+    if (!store.lists.some(l => l.id === id)) return;
+    if (editIndex >= 0) endEdit();
+    store.activeId = id;
+    items = activeList().items;
+    selectedId = null;
+    persistLists(); saveSettings();
+    renderListBar(); render();
+  }
+  function newList(name, initItems) {
+    const id = uid();
+    store.lists.push({ id, name: (name || '').trim() || 'Neue Liste', items: initItems || [] });
+    store.activeId = id;
+    items = activeList().items;
+    selectedId = null;
+    persistLists(); saveSettings();
+    renderListBar(); render();
+    return id;
+  }
+  async function promptNewList() {
+    const name = await dialogPrompt('Neue Liste', 'Neue Liste', 'Anlegen');
+    if (name == null) return;
+    newList(name, []);
+    toast('Liste angelegt');
+  }
+  async function renameList() {
+    const l = activeList();
+    const name = await dialogPrompt('Liste umbenennen', l.name, 'Speichern');
+    if (name == null) return;
+    l.name = name.trim() || l.name;
+    persistLists(); renderListBar();
+    toast('Liste umbenannt');
+  }
+  async function deleteList() {
+    const l = activeList();
+    const ok = await dialogConfirm('Liste löschen', `Liste „${l.name}" mit ${l.items.length} Eintrag/Einträgen wirklich löschen?`, 'Löschen', 'Abbrechen', true);
+    if (!ok) return;
+    store.lists = store.lists.filter(x => x.id !== l.id);
+    if (!store.lists.length) store.lists.push({ id: uid(), name: 'Meine Liste', items: [] });
+    store.activeId = store.lists[0].id;
+    items = activeList().items;
+    selectedId = null;
+    persistLists(); saveSettings();
+    renderListBar(); render();
+    toast('Liste gelöscht');
+  }
 
   // --- Rendern ---
   function shopLabel(key) { return key ? key : 'Ohne Geschäft'; }
@@ -150,7 +293,7 @@
     label.textContent = it.name;
     if (it.qty) { const q = document.createElement('span'); q.className = 'qty'; q.textContent = '× ' + it.qty; label.appendChild(q); }
     if (showChip && it.shop) { const c = document.createElement('span'); c.className = 'shop-chip'; c.textContent = it.shop; label.appendChild(c); }
-    label.addEventListener('click', () => selectItem(it.id));
+    attachLabel(label, it);
 
     const star = document.createElement('button');
     star.className = 'star' + (it.fav ? ' on' : ''); star.type = 'button';
@@ -340,6 +483,58 @@
     handle.addEventListener('pointercancel', end);
   }
 
+  // --- Eintrag auswählen / bearbeiten (Doppelklick oder langes Berühren) ---
+  function attachLabel(label, it) {
+    // Maus: Doppelklick lädt zum Bearbeiten
+    label.addEventListener('dblclick', () => loadForEdit(it.id));
+    // Touch: langes Berühren (~500 ms) lädt zum Bearbeiten
+    let timer = null, sx = 0, sy = 0;
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    label.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      sx = e.clientX; sy = e.clientY;
+      timer = setTimeout(() => { timer = null; suppressClick = Date.now(); loadForEdit(it.id); }, 500);
+    });
+    label.addEventListener('pointermove', (e) => {
+      if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
+    });
+    label.addEventListener('pointerup', cancel);
+    label.addEventListener('pointercancel', cancel);
+    label.addEventListener('contextmenu', (e) => e.preventDefault());
+    // einfacher Klick: markieren (unterdrückt, falls gerade lang berührt wurde)
+    label.addEventListener('click', (e) => {
+      if (Date.now() - suppressClick < 600) { e.preventDefault(); e.stopPropagation(); return; }
+      selectItem(it.id);
+    });
+  }
+
+  function loadForEdit(id) {
+    const idx = items.findIndex(i => i.id === id);
+    if (idx < 0) return;
+    const it = items[idx];
+    itemInput.value = it.name;
+    qtyInput.value = it.qty || '1';
+    shopInput.value = it.shop || '';
+    items.splice(idx, 1);          // vorhandenen Eintrag entfernen (Favoriten unberührt)
+    editIndex = idx;               // Zielposition fürs Wiedereinfügen merken
+    if (selectedId === id) selectedId = null;
+    form.classList.add('editing');
+    btnAdd.textContent = '✓';
+    btnAdd.setAttribute('aria-label', 'Änderung übernehmen');
+    saveItems(); saveSettings(); render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    itemInput.focus();
+    try { itemInput.setSelectionRange(0, itemInput.value.length); } catch {}
+    toast('Eintrag geladen – ändern und mit ＋ übernehmen');
+  }
+
+  function endEdit() {
+    editIndex = -1;
+    form.classList.remove('editing');
+    btnAdd.textContent = '＋';
+    btnAdd.setAttribute('aria-label', 'Hinzufügen');
+  }
+
   // --- CSV ---
   function csvEscape(v) {
     const s = String(v ?? '');
@@ -371,7 +566,17 @@
   }
   function truthy(v) { return ['ja', 'yes', 'true', '1', 'x', 'erledigt'].includes((v || '').trim().toLowerCase()); }
 
-  function importCSV(text) {
+  function mergeImportedFavorites(imported) {
+    let added = false;
+    imported.forEach(it => {
+      if (it.fav && favorites.findIndex(favMatch(it.name, it.shop)) === -1) {
+        favorites.push({ name: it.name, qty: it.qty, shop: it.shop }); added = true;
+      }
+    });
+    if (added) saveFav();
+  }
+
+  async function importCSV(text, suggestedName) {
     const rows = parseCSV(text).filter(r => r.some(c => c.trim() !== ''));
     if (!rows.length) { toast('Datei ist leer'); return; }
 
@@ -400,13 +605,31 @@
     }
     if (!imported.length) { toast('Keine Artikel gefunden'); return; }
 
-    const replace = items.length === 0 ||
-      confirm(`${imported.length} Artikel importieren.\n\nOK = aktuelle Liste ersetzen\nAbbrechen = an Liste anhängen`);
-    items = replace ? imported : items.concat(imported);
-    // importierte Favoriten in den Favoritenspeicher übernehmen
-    imported.forEach(it => { if (it.fav && favorites.findIndex(favMatch(it.name, it.shop)) === -1) favorites.push({ name: it.name, qty: it.qty, shop: it.shop }); });
+    const choice = await openDialog({
+      title: 'Importieren',
+      message: `${imported.length} Artikel gefunden. Wohin sollen sie?`,
+      buttons: [
+        { label: 'Abbrechen', value: 'cancel' },
+        { label: 'Anhängen', value: 'append' },
+        { label: 'Ersetzen', value: 'replace', danger: true },
+        { label: 'Neue Liste', value: 'new', primary: true }
+      ]
+    });
+    if (!choice || choice === 'cancel') return;
+
+    if (choice === 'new') {
+      const name = await dialogPrompt('Name der neuen Liste', suggestedName || 'Importierte Liste', 'Importieren');
+      if (name == null) return;                 // Abbruch -> nichts ändern
+      mergeImportedFavorites(imported);
+      newList(name, imported);
+      toast(`Neue Liste „${activeList().name}" mit ${imported.length} Artikeln`);
+      return;
+    }
+
+    mergeImportedFavorites(imported);
+    items = (choice === 'replace' || items.length === 0) ? imported : items.concat(imported);
     selectedId = null;
-    saveItems(); saveFav(); saveSettings(); render();
+    saveItems(); saveSettings(); render();
     toast(`${imported.length} Artikel importiert`);
   }
 
@@ -450,7 +673,17 @@
   // --- Events ---
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    addItem(itemInput.value, qtyInput.value, shopInput.value);
+    if (editIndex >= 0) {
+      const name = itemInput.value.trim();
+      if (!name) return;   // ohne Namen nicht übernehmen
+      const it = { id: uid(), name, qty: qtyInput.value.trim() || '1', shop: shopInput.value.trim(), done: false, fav: false };
+      items.splice(Math.min(editIndex, items.length), 0, it);  // an ursprünglicher Position
+      selectedId = it.id;
+      endEdit();
+      saveItems(); saveSettings(); render();
+    } else {
+      addItem(itemInput.value, qtyInput.value, shopInput.value);
+    }
     itemInput.value = ''; qtyInput.value = '1';
     itemInput.focus();
   });
@@ -491,12 +724,19 @@
   fileInput.addEventListener('change', () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
+    const suggested = file.name.replace(/\.csv$/i, '');
     const reader = new FileReader();
-    reader.onload = () => importCSV(String(reader.result || ''));
+    reader.onload = () => importCSV(String(reader.result || ''), suggested);
     reader.onerror = () => toast('Datei konnte nicht gelesen werden');
     reader.readAsText(file, 'utf-8');
     fileInput.value = '';
   });
+
+  // Listen-Bedienelemente
+  listSelect.addEventListener('change', () => switchList(listSelect.value));
+  document.getElementById('list-new').addEventListener('click', promptNewList);
+  document.getElementById('list-rename').addEventListener('click', renameList);
+  document.getElementById('list-delete').addEventListener('click', deleteList);
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
@@ -508,5 +748,7 @@
     saveItems();
   }
 
+  persistLists();   // migrierten/aktuellen Stand sichern
+  renderListBar();
   render();
 })();

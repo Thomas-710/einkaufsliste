@@ -1,5 +1,5 @@
 /* Offline-Cache für die Einkaufslisten-PWA */
-const CACHE = 'einkaufsliste-v4';
+const CACHE = 'einkaufsliste-v7';
 const ASSETS = [
   './',
   './index.html',
