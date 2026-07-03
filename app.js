@@ -20,6 +20,7 @@
   let selectedId = settings.selectedId || null;
   let shopOrder = Array.isArray(settings.shopOrder) ? settings.shopOrder : [];
   let autoloadFav = !!settings.autoloadFav;
+  let shops = Array.isArray(settings.shops) ? settings.shops : [];
 
   // --- Elemente ---
   const listWrap = document.getElementById('list');
@@ -28,18 +29,25 @@
   const form = document.getElementById('add-form');
   const itemInput = document.getElementById('item-input');
   const qtyInput = document.getElementById('qty-input');
-  const shopInput = document.getElementById('shop-input');
-  const shopList = document.getElementById('shop-list');
+  const shopField = document.getElementById('shop-field');
+  const shopFieldLabel = document.getElementById('shop-field-label');
   const fileInput = document.getElementById('file-input');
   const toastEl = document.getElementById('toast');
   const btnGroup = document.getElementById('btn-group');
   const btnAdd = document.querySelector('.btn-add');
   const favSheet = document.getElementById('fav-sheet');
   const favListEl = document.getElementById('fav-list');
+  const favFilterInput = document.getElementById('fav-filter');
   const listSelect = document.getElementById('list-select');
+  const shopSheet = document.getElementById('shop-sheet');
+  const shopSheetList = document.getElementById('shop-sheet-list');
+  const shopNewInput = document.getElementById('shop-new-input');
+  const shopNewForm = document.getElementById('shop-new-form');
 
   let editIndex = -1;       // >=0: ein Eintrag wird gerade bearbeitet (Zielposition)
   let suppressClick = 0;    // unterdrückt den Klick direkt nach langem Berühren
+  let formShop = '';        // aktuell im Formular gewähltes Geschäft
+  let favFilter = '';       // Filter für die Favoritenliste (Anfangsbuchstaben)
 
   // --- Laden / Speichern ---
   function loadJSON(key, fallback) {
@@ -78,7 +86,7 @@
   function saveItems() { activeList().items = items; persistLists(); }
   function saveFav() { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); }
   function saveSettings() {
-    settings = { grouped, collapsed: [...collapsed], selectedId, shopOrder, autoloadFav };
+    settings = { grouped, collapsed: [...collapsed], selectedId, shopOrder, autoloadFav, shops };
     localStorage.setItem(SET_KEY, JSON.stringify(settings));
   }
   function loadFavoritesIntoList() {
@@ -268,7 +276,6 @@
     emptyHint.style.display = items.length ? 'none' : 'block';
     const open = items.filter(i => !i.done).length;
     counterEl.textContent = items.length ? `${open} offen / ${items.length} gesamt` : '';
-    refreshShopList();
   }
 
   function itemEl(it, showChip) {
@@ -310,14 +317,53 @@
     return li;
   }
 
-  function refreshShopList() {
-    const shops = new Set();
-    items.forEach(i => i.shop && shops.add(i.shop));
-    favorites.forEach(f => f.shop && shops.add(f.shop));
-    shopList.innerHTML = '';
-    [...shops].sort((a, b) => a.localeCompare(b, 'de')).forEach(s => {
-      const o = document.createElement('option'); o.value = s; shopList.appendChild(o);
+  // Alle bekannten Geschäfte: gemerkte + in Liste/Favoriten verwendete, alphabetisch
+  function allShops() {
+    const set = new Set();
+    shops.forEach(s => s && set.add(s));
+    items.forEach(i => i.shop && set.add(i.shop));
+    favorites.forEach(f => f.shop && set.add(f.shop));
+    return [...set].sort((a, b) => a.localeCompare(b, 'de'));
+  }
+  function addShop(name) {
+    name = (name || '').trim();
+    if (!name) return '';
+    if (!shops.includes(name)) { shops.push(name); saveSettings(); }
+    return name;
+  }
+
+  // --- Geschäft auswählen (Sheet analog der Listen-Auswahl) ---
+  let shopResolve = null;
+  function openShopPicker(current) {
+    return new Promise(resolve => {
+      shopResolve = resolve;
+      renderShopPicker(current || '');
+      shopNewInput.value = '';
+      shopSheet.hidden = false;
     });
+  }
+  function closeShopPicker(value) {
+    shopSheet.hidden = true;
+    const r = shopResolve; shopResolve = null;
+    if (r) r(value);
+  }
+  function renderShopPicker(current) {
+    shopSheetList.innerHTML = '';
+    const mk = (label, value, active) => {
+      const li = document.createElement('li');
+      li.className = 'picker-row' + (active ? ' active' : '');
+      const t = document.createElement('span'); t.className = 'picker-name'; t.textContent = label;
+      li.appendChild(t);
+      if (active) { const c = document.createElement('span'); c.className = 'picker-check'; c.textContent = '✓'; li.appendChild(c); }
+      li.addEventListener('click', () => closeShopPicker(value));
+      shopSheetList.appendChild(li);
+    };
+    mk('Ohne Geschäft', '', current === '');
+    allShops().forEach(s => mk(s, s, s === current));
+  }
+  function updateShopField() {
+    shopFieldLabel.textContent = formShop || 'Ohne Geschäft';
+    shopField.classList.toggle('has-shop', !!formShop);
   }
 
   // --- Aktionen ---
@@ -382,6 +428,7 @@
     if (selIdx >= 0) items.splice(selIdx + 1, 0, it); else items.push(it);
     selectedId = it.id;
     saveItems(); saveSettings(); render();
+    return it;
   }
 
   function renderFavSheet() {
@@ -393,19 +440,37 @@
       favListEl.appendChild(li);
       return;
     }
-    favorites.forEach((f, i) => {
+    const q = favFilter.trim().toLowerCase();
+    const list = q ? favorites.filter(f => f.name.trim().toLowerCase().startsWith(q)) : favorites;
+    if (!list.length) {
+      const li = document.createElement('li');
+      li.className = 'fav-empty';
+      li.textContent = `Keine Favoriten mit „${favFilter.trim()}".`;
+      favListEl.appendChild(li);
+      return;
+    }
+    list.forEach((f) => {
       const li = document.createElement('li');
       li.className = 'fav-item';
       const name = document.createElement('span');
       name.className = 'fav-name';
       name.textContent = f.name + (f.shop ? ` · ${f.shop}` : '');
-      if (f.qty) { const q = document.createElement('span'); q.className = 'qty'; q.textContent = '× ' + f.qty; name.appendChild(q); }
-      name.addEventListener('click', () => { addFavoriteToList(f); toast(`„${f.name}" hinzugefügt`); });
+      if (f.qty) { const q2 = document.createElement('span'); q2.className = 'qty'; q2.textContent = '× ' + f.qty; name.appendChild(q2); }
+      name.addEventListener('click', async () => {
+        const it = addFavoriteToList(f);
+        toast(`„${f.name}" hinzugefügt`);
+        // Feature: Favorit ohne Geschäft -> Geschäft-Auswahl automatisch einblenden
+        if (!f.shop) {
+          const s = await openShopPicker('');
+          if (s) { it.shop = s; saveItems(); render(); }
+        }
+      });
       const rm = document.createElement('button');
       rm.className = 'fav-rm'; rm.type = 'button'; rm.textContent = '🗑';
       rm.setAttribute('aria-label', 'Favorit löschen');
       rm.addEventListener('click', () => {
-        favorites.splice(i, 1);
+        const idx = favorites.indexOf(f);
+        if (idx !== -1) favorites.splice(idx, 1);
         items.forEach(it => { if (favMatch(f.name, f.shop)(it)) it.fav = false; });
         saveFav(); saveItems(); renderFavSheet(); render();
       });
@@ -414,7 +479,11 @@
     });
   }
 
-  function openFav() { renderFavSheet(); favSheet.hidden = false; }
+  function openFav() {
+    favFilter = '';
+    if (favFilterInput) favFilterInput.value = '';
+    renderFavSheet(); favSheet.hidden = false;
+  }
   function closeFav() { favSheet.hidden = true; }
 
   // --- Drag & Drop (Touch + Maus via Pointer Events) ---
@@ -514,7 +583,7 @@
     const it = items[idx];
     itemInput.value = it.name;
     qtyInput.value = it.qty || '1';
-    shopInput.value = it.shop || '';
+    formShop = it.shop || ''; updateShopField();
     items.splice(idx, 1);          // vorhandenen Eintrag entfernen (Favoriten unberührt)
     editIndex = idx;               // Zielposition fürs Wiedereinfügen merken
     if (selectedId === id) selectedId = null;
@@ -676,13 +745,13 @@
     if (editIndex >= 0) {
       const name = itemInput.value.trim();
       if (!name) return;   // ohne Namen nicht übernehmen
-      const it = { id: uid(), name, qty: qtyInput.value.trim() || '1', shop: shopInput.value.trim(), done: false, fav: false };
+      const it = { id: uid(), name, qty: qtyInput.value.trim() || '1', shop: formShop, done: false, fav: false };
       items.splice(Math.min(editIndex, items.length), 0, it);  // an ursprünglicher Position
       selectedId = it.id;
       endEdit();
       saveItems(); saveSettings(); render();
     } else {
-      addItem(itemInput.value, qtyInput.value, shopInput.value);
+      addItem(itemInput.value, qtyInput.value, formShop);
     }
     itemInput.value = ''; qtyInput.value = '1';
     itemInput.focus();
@@ -715,6 +784,20 @@
     closeFav(); toast(`${favorites.length} Favoriten hinzugefügt`);
   });
   favSheet.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeFav));
+  favFilterInput.addEventListener('input', () => { favFilter = favFilterInput.value; renderFavSheet(); });
+
+  // Geschäft-Auswahl
+  shopField.addEventListener('click', async () => {
+    const s = await openShopPicker(formShop);
+    if (s != null) { formShop = s; updateShopField(); }
+  });
+  shopNewForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = addShop(shopNewInput.value);
+    if (!name) return;
+    closeShopPicker(name);
+  });
+  shopSheet.querySelectorAll('[data-shop-close]').forEach(el => el.addEventListener('click', () => closeShopPicker(null)));
 
   document.getElementById('btn-share').addEventListener('click', shareList);
   document.getElementById('btn-export').addEventListener('click', downloadCSV);
@@ -750,5 +833,6 @@
 
   persistLists();   // migrierten/aktuellen Stand sichern
   renderListBar();
+  updateShopField();
   render();
 })();

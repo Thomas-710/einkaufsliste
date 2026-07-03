@@ -76,7 +76,7 @@ main {
 .add-form { margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
 .add-form .row { display: flex; gap: 8px; }
 
-.item-input, .qty-input, .shop-input {
+.item-input, .qty-input {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 13px 14px;
@@ -86,13 +86,31 @@ main {
 }
 .item-input { flex: 1; min-width: 0; }
 .qty-input { width: 84px; }
-.shop-input { flex: 1; min-width: 0; }
 
-.item-input:focus, .qty-input:focus, .shop-input:focus {
+.item-input:focus, .qty-input:focus {
   outline: none;
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green-light);
 }
+
+/* Geschäft-Auswahlfeld (öffnet die Geschäft-Liste) */
+.shop-field {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 14px;
+  font-size: 1rem;
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+.shop-field.has-shop { color: var(--text); font-weight: 600; }
+.shop-field:active { background: var(--green-light); }
+.shop-field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop-field-chev { color: var(--muted); flex-shrink: 0; }
+.add-form.editing .shop-field { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245,166,35,.25); }
 
 .btn-add {
   border: none;
@@ -258,6 +276,17 @@ ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 .sheet-head h2 { margin: 0; font-size: 1.15rem; }
 .sheet-x { border: none; background: transparent; font-size: 1.3rem; cursor: pointer; color: var(--muted); }
 .sheet-hint { color: var(--muted); font-size: .85rem; margin: 4px 0 10px; }
+.fav-filter {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  background: var(--card);
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.fav-filter:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-light); }
 .fav-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .fav-item {
   display: flex; align-items: center; gap: 10px;
@@ -275,6 +304,27 @@ ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 }
 .fav-toggle input { width: 20px; height: 20px; accent-color: var(--green); flex-shrink: 0; }
 .sheet-actions { margin-top: 12px; }
+
+/* Geschäft-Auswahl-Sheet */
+#shop-sheet { z-index: 45; }
+.picker-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.picker-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px;
+  cursor: pointer; font-size: 1rem;
+}
+.picker-row:active { background: var(--green-light); }
+.picker-row.active { border-color: var(--green); background: var(--green-light); font-weight: 600; color: var(--green-dark); }
+.picker-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-check { color: var(--green); flex-shrink: 0; }
+.shop-new-form { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.shop-new-input {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 11px 12px; font-size: 1rem; background: var(--card); color: var(--text);
+}
+.shop-new-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-light); }
+.shop-new-form .tool { flex: 0 0 auto; padding: 11px 16px; }
 
 /* Eigenes Eingabe-/Abfragefenster */
 .dialog { position: fixed; inset: 0; z-index: 50; }

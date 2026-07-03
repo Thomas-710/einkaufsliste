@@ -31,8 +31,10 @@
         <button type="submit" class="btn-add" aria-label="Hinzufügen">＋</button>
       </div>
       <div class="row">
-        <input id="shop-input" class="shop-input" type="text" list="shop-list" placeholder="Geschäft (optional, z. B. Aldi)" />
-        <datalist id="shop-list"></datalist>
+        <button id="shop-field" type="button" class="shop-field" aria-label="Geschäft auswählen">
+          <span id="shop-field-label" class="shop-field-label">Ohne Geschäft</span>
+          <span class="shop-field-chev" aria-hidden="true">▾</span>
+        </button>
       </div>
     </form>
 
@@ -62,6 +64,7 @@
         <button id="fav-close" class="sheet-x" aria-label="Schließen" data-close>✕</button>
       </div>
       <p class="sheet-hint">Tippe einen Favoriten, um ihn zur aktuellen Liste hinzuzufügen.</p>
+      <input id="fav-filter" class="fav-filter" type="text" placeholder="Nach Anfangsbuchstaben filtern…" autocomplete="off" aria-label="Favoriten filtern" />
       <ul id="fav-list" class="fav-list"></ul>
       <label class="fav-toggle">
         <input type="checkbox" id="fav-autoload" />
@@ -70,6 +73,23 @@
       <div class="sheet-actions">
         <button id="fav-add-all" type="button" class="tool">Alle zur Liste hinzufügen</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Geschäft-Auswahl-Sheet -->
+  <div id="shop-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-shop-close></div>
+    <div class="sheet-panel" role="dialog" aria-label="Geschäft wählen">
+      <div class="sheet-head">
+        <h2>🏬 Geschäft wählen</h2>
+        <button class="sheet-x" aria-label="Schließen" data-shop-close>✕</button>
+      </div>
+      <p class="sheet-hint">Tippe ein Geschäft an oder lege unten ein neues an.</p>
+      <ul id="shop-sheet-list" class="picker-list"></ul>
+      <form id="shop-new-form" class="shop-new-form" autocomplete="off">
+        <input id="shop-new-input" class="shop-new-input" type="text" placeholder="Neues Geschäft…" aria-label="Neues Geschäft" />
+        <button type="submit" class="tool">Anlegen</button>
+      </form>
     </div>
   </div>
 
